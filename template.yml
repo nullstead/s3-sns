@@ -30,8 +30,7 @@ Resources:
   FileUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'file-uploads-${AWS::AccountId}${BucketNameSuffix}'
-      BucketNameSuffix: !FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]
+      BucketName: !Sub 'file-uploads-${AWS::AccountId}${!FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]}'
       NotificationConfiguration:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'
@@ -45,7 +44,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref FileUploadProcessor
       Principal: s3.amazonaws.com
-      SourceArn: !Sub 'arn:aws:s3:::file-uploads-${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
+      SourceArn: !Sub 'arn:aws:s3:::file-uploads-${AWS::AccountId}${BucketNameSuffix}'
 
   # SNS Topic for notifications
   NotificationTopic:
