@@ -51,7 +51,7 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub 'file_upload_notifications_${Environment}'
-      DisplayName: !Sub 'File Upload Notifications (${Environment})'
+      DisplayName: !Sub 'File_Upload_Notifications_(${Environment})'
 
   # Email subscription to the SNS topic
   EmailNotificationSubscription:
