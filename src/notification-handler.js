@@ -7,8 +7,10 @@ const url = require('url');
 exports.handler = async (event, context) => {
   console.log('Event:', JSON.stringify(event, null, 2));
   
+  // Extract event details
   const requestType = event.RequestType;
   const resourceProperties = event.ResourceProperties;
+  const bucketName = resourceProperties.BucketName;
   
   let responseData = {};
   let responseStatus = 'SUCCESS';
@@ -16,9 +18,19 @@ exports.handler = async (event, context) => {
   try {
     if (requestType === 'Create' || requestType === 'Update') {
       // Configure S3 bucket notification
+      console.log(`Configuring notification for bucket: ${bucketName}`);
+      
+      // Convert resource properties to proper format
+      const notificationConfig = {
+        LambdaFunctionConfigurations: resourceProperties.NotificationConfiguration.LambdaFunctionConfigurations.map(config => ({
+          Events: [config.Event],
+          LambdaFunctionArn: config.Function
+        }))
+      };
+      
       const params = {
-        Bucket: resourceProperties.BucketName,
-        NotificationConfiguration: resourceProperties.NotificationConfiguration
+        Bucket: bucketName,
+        NotificationConfiguration: notificationConfig
       };
       
       console.log('Putting bucket notification configuration:', JSON.stringify(params, null, 2));
@@ -27,14 +39,14 @@ exports.handler = async (event, context) => {
       responseData = { Message: 'Bucket notification configuration updated successfully' };
     } else if (requestType === 'Delete') {
       // Clear notification configuration on delete
+      console.log(`Clearing notification configuration for bucket: ${bucketName}`);
+      
       const params = {
-        Bucket: resourceProperties.BucketName,
+        Bucket: bucketName,
         NotificationConfiguration: {}
       };
       
-      console.log('Clearing bucket notification configuration for bucket:', resourceProperties.BucketName);
       await s3.putBucketNotificationConfiguration(params).promise();
-      
       responseData = { Message: 'Bucket notification configuration cleared successfully' };
     }
   } catch (error) {
@@ -52,7 +64,7 @@ async function sendResponse(event, context, responseStatus, responseData) {
   const responseBody = JSON.stringify({
     Status: responseStatus,
     Reason: responseData.Error || 'See the details in CloudWatch Log Stream: ' + context.logStreamName,
-    PhysicalResourceId: context.logStreamName,
+    PhysicalResourceId: event.LogicalResourceId + '-' + event.RequestId,
     StackId: event.StackId,
     RequestId: event.RequestId,
     LogicalResourceId: event.LogicalResourceId,
