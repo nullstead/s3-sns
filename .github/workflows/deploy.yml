@@ -45,7 +45,6 @@ jobs:
         run: |
           cd src
           npm install
-          npm ci
       
       - name: Setup AWS SAM
         uses: aws-actions/setup-sam@v2
