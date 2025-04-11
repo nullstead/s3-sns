@@ -75,6 +75,7 @@ jobs:
             --stack-name file-upload-notification-${{ env.ENVIRONMENT }} \
             --no-fail-on-empty-changeset \
             --no-confirm-changeset \
+            --resolve-s3 \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
               EmailSubscription=${{ steps.params.outputs.email }}

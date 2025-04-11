@@ -3,8 +3,6 @@ version = 0.1
 [default.deploy]
 [default.deploy.parameters]
 stack_name = "file-upload-notification-dev"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket"
-s3_prefix = "file-upload-notification-dev"
 region = "eu-west-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
@@ -15,8 +13,6 @@ parameter_overrides = "Environment=dev EmailSubscription=nullstead@gmail.com"
 [dev.deploy]
 [dev.deploy.parameters]
 stack_name = "file-upload-notification-dev"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket"
-s3_prefix = "file-upload-notification-dev"
 region = "eu-west-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
@@ -27,8 +23,6 @@ parameter_overrides = "Environment=dev EmailSubscription=nullstead@gmail.com"
 [prod.deploy]
 [prod.deploy.parameters]
 stack_name = "file-upload-notification-prod"
-s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket"
-s3_prefix = "file-upload-notification-prod"
 region = "eu-west-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
