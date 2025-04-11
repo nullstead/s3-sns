@@ -54,7 +54,7 @@ Resources:
       DisplayName: !Sub 'File Upload Notifications (${Environment})'
 
   # Email subscription to the SNS topic
-  EmailSubscription:
+  EmailNotificationSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
