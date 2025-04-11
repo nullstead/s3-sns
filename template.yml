@@ -30,7 +30,7 @@ Resources:
   FileUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'file-uploads-${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
+      BucketName: !Sub 'file_uploads_${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
       NotificationConfiguration:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'
@@ -44,13 +44,13 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref FileUploadProcessor
       Principal: s3.amazonaws.com
-      SourceArn: !Sub 'arn:aws:s3:::file-uploads-${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
+      SourceArn: !Sub 'arn:aws:s3:::file_uploads_${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
 
   # SNS Topic for notifications
   NotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub 'file-upload-notifications-${Environment}'
+      TopicName: !Sub 'file_upload_notifications_${Environment}'
       DisplayName: !Sub 'File Upload Notifications (${Environment})'
 
   # Email subscription to the SNS topic
@@ -65,7 +65,7 @@ Resources:
   FileUploadProcessor:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'file-upload-processor-${Environment}'
+      FunctionName: !Sub 'file_upload_processor_${Environment}'
       Runtime: nodejs22.x
       Architectures:
         - x86_64
