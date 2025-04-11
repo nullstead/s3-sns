@@ -90,14 +90,16 @@ Resources:
   S3NotificationCustomResource:
     Type: Custom::S3BucketNotification
     DependsOn: 
-      - LambdaInvokePermission  # Only keep this explicit dependency
+      - FileUploadBucket
+      - FileUploadProcessor
+      - LambdaInvokePermission
     Properties:
       ServiceToken: !Ref BucketNotificationFunction
-      BucketName: !Ref FileUploadBucket  # This creates implicit dependency on FileUploadBucket
+      BucketName: !Ref FileUploadBucket
       NotificationConfiguration:
         LambdaFunctionConfigurations:
           - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt FileUploadProcessor.Arn  # This creates implicit dependency on FileUploadProcessor
+            Function: !GetAtt FileUploadProcessor.Arn
 
   # Lambda function to handle the custom resource for S3 bucket notifications
   BucketNotificationFunction:
@@ -115,7 +117,6 @@ Resources:
             - Effect: Allow
               Action:
                 - 's3:PutBucketNotification'
-                - 's3:PutBucketNotificationConfiguration'  # Added this permission as well
               Resource: 
                 Fn::Sub:
                   - 'arn:aws:s3:::file-uploads-${AWS::AccountId}${Suffix}'
