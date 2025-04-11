@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  S3-to-SNS Notification Service
+  An event-driven architecture that sends email notifications when files are uploaded to S3
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment type (development or production)
+  
+  EmailSubscription:
+    Type: String
+    Description: Email address to receive notifications
+    Default: john.kponyo@amalitech.com
+
+Mappings:
+  EnvironmentMap:
+    dev:
+      BucketNameSuffix: -dev
+    prod:
+      BucketNameSuffix: -prod
+
+Resources:
+  # S3 bucket for file uploads
+  FileUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'file-uploads-${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Function: !GetAtt FileUploadProcessor.Arn
+    DependsOn: LambdaInvokePermission
+
+  # Lambda permission to allow S3 to invoke our function
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref FileUploadProcessor
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:aws:s3:::file-uploads-${AWS::AccountId}${EnvironmentMap.${Environment}.BucketNameSuffix}'
+
+  # SNS Topic for notifications
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'file-upload-notifications-${Environment}'
+      DisplayName: !Sub 'File Upload Notifications (${Environment})'
+
+  # Email subscription to the SNS topic
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref NotificationTopic
+      Endpoint: !Ref EmailSubscription
+
+  # Lambda function to process S3 events
+  FileUploadProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'file-upload-processor-${Environment}'
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Handler: app.handler
+      CodeUri: ./src/
+      Description: Processes S3 upload events and sends notifications via SNS
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+          ENVIRONMENT: !Ref Environment
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - S3ReadPolicy:
+            BucketName: !Ref FileUploadBucket
+
+Outputs:
+  FileUploadBucketName:
+    Description: "Name of the S3 bucket for file uploads"
+    Value: !Ref FileUploadBucket
+
+  FileUploadBucketArn:
+    Description: "ARN of the S3 bucket for file uploads"
+    Value: !GetAtt FileUploadBucket.Arn
+  
+  NotificationTopicArn:
+    Description: "ARN of the SNS topic for notifications"
+    Value: !Ref NotificationTopic
+  
+  LambdaFunctionArn:
+    Description: "ARN of the Lambda function"
+    Value: !GetAtt FileUploadProcessor.Arn
