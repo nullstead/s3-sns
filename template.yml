@@ -26,7 +26,7 @@ Mappings:
       BucketNameSuffix: -prod
 
 Resources:
-  # S3 bucket for file uploads
+  # S3 bucket for file uploads - NOTIFICATION CONFIGURATION REMOVED TO BREAK CIRCULAR DEPENDENCY
   FileUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -34,11 +34,30 @@ Resources:
         Fn::Sub:
           - 'file-uploads-${AWS::AccountId}${Suffix}'
           - Suffix: !FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt FileUploadProcessor.Arn
-    DependsOn: LambdaInvokePermission
+      # NotificationConfiguration removed to break circular dependency
+
+  # Lambda function to process S3 events
+  FileUploadProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'file-upload-processor-${Environment}'
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Handler: app.handler
+      CodeUri: ./src/
+      Description: Processes S3 upload events and sends notifications via SNS
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref NotificationTopic
+          ENVIRONMENT: !Ref Environment
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - S3ReadPolicy:
+            BucketName: !Ref FileUploadBucket
 
   # Lambda permission to allow S3 to invoke our function
   LambdaInvokePermission:
@@ -66,29 +85,39 @@ Resources:
       Protocol: email
       TopicArn: !Ref NotificationTopic
       Endpoint: !Ref EmailSubscription
+      
+  # Use a custom resource to configure the S3 bucket notification after all resources are created
+  S3NotificationCustomResource:
+    Type: Custom::S3BucketNotification
+    DependsOn: 
+      - FileUploadBucket
+      - FileUploadProcessor
+      - LambdaInvokePermission
+    Properties:
+      ServiceToken: !Ref BucketNotificationFunction
+      BucketName: !Ref FileUploadBucket
+      NotificationConfiguration:
+        LambdaFunctionConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Function: !GetAtt FileUploadProcessor.Arn
 
-  # Lambda function to process S3 events
-  FileUploadProcessor:
+  # Lambda function to handle the custom resource for S3 bucket notifications
+  BucketNotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'file-upload-processor-${Environment}'
+      FunctionName: !Sub 'bucket-notification-handler-${Environment}'
       Runtime: nodejs22.x
-      Architectures:
-        - x86_64
-      Handler: app.handler
+      Handler: notification-handler.handler
       CodeUri: ./src/
-      Description: Processes S3 upload events and sends notifications via SNS
-      MemorySize: 128
-      Timeout: 10
-      Environment:
-        Variables:
-          SNS_TOPIC_ARN: !Ref NotificationTopic
-          ENVIRONMENT: !Ref Environment
+      Description: Handles S3 bucket notification configuration
+      Timeout: 30
       Policies:
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt NotificationTopic.TopicName
-        - S3ReadPolicy:
-            BucketName: !Ref FileUploadBucket
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 's3:PutBucketNotification'
+              Resource: !Sub 'arn:aws:s3:::file-uploads-${AWS::AccountId}${!FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]}'
 
 Outputs:
   FileUploadBucketName:
