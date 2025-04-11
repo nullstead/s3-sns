@@ -44,6 +44,7 @@ jobs:
       - name: Install dependencies for Lambda
         run: |
           cd src
+          npm install
           npm ci
       
       - name: Setup AWS SAM
