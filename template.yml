@@ -33,10 +33,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub 'file-upload-notifications-${Environment}-${AWS::AccountId}'
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt NotificationFunction.Arn
 
   # Lambda invoke permission from S3
   S3InvokePermission:
@@ -45,6 +41,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref NotificationFunction
       Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
       SourceArn: !GetAtt UploadBucket.Arn
 
   # SNS Topic for notifications
@@ -78,6 +75,63 @@ Resources:
             TopicName: !GetAtt NotificationTopic.TopicName
         - S3ReadPolicy:
             BucketName: !Ref UploadBucket
+
+  # Custom resource to set up S3 bucket notifications
+  NotificationConfigFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      InlineCode: |
+        const AWS = require('aws-sdk');
+        const s3 = new AWS.S3();
+        const response = require('cfn-response');
+        
+        exports.handler = async (event, context) => {
+          try {
+            if (event.RequestType === 'Delete') {
+              return response.send(event, context, response.SUCCESS);
+            }
+            
+            const bucketName = event.ResourceProperties.BucketName;
+            const lambdaArn = event.ResourceProperties.LambdaArn;
+            
+            const params = {
+              Bucket: bucketName,
+              NotificationConfiguration: {
+                LambdaFunctionConfigurations: [
+                  {
+                    Events: ['s3:ObjectCreated:*'],
+                    LambdaFunctionArn: lambdaArn
+                  }
+                ]
+              }
+            };
+            
+            await s3.putBucketNotificationConfiguration(params).promise();
+            return response.send(event, context, response.SUCCESS);
+          } catch (error) {
+            console.error('Error:', error);
+            return response.send(event, context, response.FAILED, { Error: error.message });
+          }
+        };
+      Handler: index.handler
+      Runtime: nodejs22.x
+      Timeout: 30
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: 's3:PutBucketNotificationConfiguration'
+              Resource: !GetAtt UploadBucket.Arn
+
+  SetupBucketNotification:
+    Type: Custom::SetupBucketNotification
+    DependsOn:
+      - NotificationFunction
+      - S3InvokePermission
+    Properties:
+      ServiceToken: !GetAtt NotificationConfigFunction.Arn
+      BucketName: !Ref UploadBucket
+      LambdaArn: !GetAtt NotificationFunction.Arn
 
 Outputs:
   UploadBucketName:
