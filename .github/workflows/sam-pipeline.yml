@@ -14,6 +14,7 @@ jobs:
     
     env:
       AWS_REGION: eu-west-1
+      S3_BUCKET: my-sam-deployment-bucket-01011
     
     steps:
       - name: Checkout code
@@ -53,7 +54,7 @@ jobs:
             --config-env ${{ env.ENVIRONMENT }} \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --resolve-s3 \
+            --s3-bucket ${{ env.S3_BUCKET }} \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
               NotificationEmail=${{ env.NOTIFICATION_EMAIL }}
