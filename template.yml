@@ -16,7 +16,7 @@ Parameters:
   AdminEmail:
     Type: String
     Description: Email address to receive notifications
-    Default: admin@example.com
+    Default: nullstead@gmail.com
 
 # Global variables
 Globals:
@@ -28,11 +28,11 @@ Globals:
       - x86_64
 
 Resources:
-  # S3 bucket for file uploads
+  # S3 bucket for file uploads (that will trigger notifications)
   UploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'file-uploads-${Environment}-${AWS::AccountId}'
+      BucketName: !Sub 'file-upload-notifications-${Environment}-${AWS::AccountId}'
       NotificationConfiguration:
         LambdaConfigurations:
           - Event: 's3:ObjectCreated:*'

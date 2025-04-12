@@ -13,9 +13,6 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     
     steps:
       - uses: actions/checkout@v4
@@ -45,20 +42,22 @@ jobs:
         run: |
           if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
             echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "s3_bucket=s3-sns-prod-bkt" >> $GITHUB_OUTPUT
           else
             echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "s3_bucket=s3-sns-dev-bkt" >> $GITHUB_OUTPUT
           fi
       
       - name: Build SAM application
         run: |
-          sam build --use-container
+          sam build
           
       - name: Deploy to AWS (dev environment)
         if: steps.determine-env.outputs.environment == 'dev'
         run: |
           sam deploy \
             --stack-name s3-notification-service-dev \
-            --config-env dev \
+            --s3-bucket ${{ steps.determine-env.outputs.s3_bucket }} \
             --parameter-overrides \
               Environment=dev \
               AdminEmail=${{ secrets.ADMIN_EMAIL_DEV }} \
@@ -70,7 +69,7 @@ jobs:
         run: |
           sam deploy \
             --stack-name s3-notification-service-prod \
-            --config-env prod \
+            --s3-bucket ${{ steps.determine-env.outputs.s3_bucket }} \
             --parameter-overrides \
               Environment=prod \
               AdminEmail=${{ secrets.ADMIN_EMAIL_PROD }} \
