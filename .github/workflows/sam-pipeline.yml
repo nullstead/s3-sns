@@ -55,6 +55,7 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --s3-bucket ${{ env.S3_BUCKET }} \
+            --capabilities CAPABILITY_IAM \
             --parameter-overrides \
               Environment=${{ env.ENVIRONMENT }} \
               NotificationEmail=${{ env.NOTIFICATION_EMAIL }}
