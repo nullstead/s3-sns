@@ -1,147 +1,71 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  S3 upload notification service using AWS Lambda and SNS
+Description: >-
+  S3 to SNS email notification using AWS Lambda and AWS SAM (Node.js 22)
 
-# Global parameters
-Parameters:
-  Environment:
-    Type: String
-    Default: dev
-    AllowedValues:
-      - dev
-      - prod
-    Description: Environment name (dev or prod)
-  
-  AdminEmail:
-    Type: String
-    Description: Email address to receive notifications
-    Default: nullstead@gmail.com
-
-# Global variables
 Globals:
   Function:
-    Timeout: 10
     Runtime: nodejs22.x
+    Timeout: 10
     MemorySize: 128
     Architectures:
       - x86_64
 
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+    Default: dev
+
 Resources:
-  # S3 bucket for file uploads (that will trigger notifications)
-  UploadBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub 'file-upload-notifications-${Environment}-${AWS::AccountId}'
 
-  # Lambda invoke permission from S3
-  S3InvokePermission:
-    Type: AWS::Lambda::Permission
+  S3UploadBucket:
+    Type: AWS::Serverless::SimpleTable
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref NotificationFunction
-      Principal: s3.amazonaws.com
-      SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt UploadBucket.Arn
+      BucketName: !Sub "upload-bucket-${Environment}-${AWS::AccountId}"
 
-  # SNS Topic for notifications
   NotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub 'file-upload-notifications-${Environment}'
-      DisplayName: 'S3 Upload Notifications'
+      TopicName: !Sub "UploadNotificationTopic-${Environment}"
 
-  # SNS Subscription for email
   EmailSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
+      Endpoint: "nullstead@gmail.com"
       TopicArn: !Ref NotificationTopic
-      Endpoint: !Ref AdminEmail
 
-  # Lambda function to process S3 events
-  NotificationFunction:
+  S3NotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub "S3NotificationFunction-${Environment}"
       CodeUri: src/
-      Handler: index.handler
-      Description: Processes S3 upload events and sends notifications via SNS
+      Handler: handler.main
+      Events:
+        S3Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref S3UploadBucket
+            Events: s3:ObjectCreated:*
       Environment:
         Variables:
-          TOPIC_ARN: !Ref NotificationTopic
-          ENVIRONMENT: !Ref Environment
+          SNS_TOPIC_ARN: !Ref NotificationTopic
       Policies:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt NotificationTopic.TopicName
         - S3ReadPolicy:
-            BucketName: !Ref UploadBucket
-
-  # Custom resource to set up S3 bucket notifications
-  NotificationConfigFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      InlineCode: |
-        const AWS = require('aws-sdk');
-        const s3 = new AWS.S3();
-        const response = require('cfn-response');
-        
-        exports.handler = async (event, context) => {
-          try {
-            if (event.RequestType === 'Delete') {
-              return response.send(event, context, response.SUCCESS);
-            }
-            
-            const bucketName = event.ResourceProperties.BucketName;
-            const lambdaArn = event.ResourceProperties.LambdaArn;
-            
-            const params = {
-              Bucket: bucketName,
-              NotificationConfiguration: {
-                LambdaFunctionConfigurations: [
-                  {
-                    Events: ['s3:ObjectCreated:*'],
-                    LambdaFunctionArn: lambdaArn
-                  }
-                ]
-              }
-            };
-            
-            await s3.putBucketNotificationConfiguration(params).promise();
-            return response.send(event, context, response.SUCCESS);
-          } catch (error) {
-            console.error('Error:', error);
-            return response.send(event, context, response.FAILED, { Error: error.message });
-          }
-        };
-      Handler: index.handler
-      Runtime: nodejs22.x
-      Timeout: 30
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action: 's3:PutBucketNotificationConfiguration'
-              Resource: !GetAtt UploadBucket.Arn
-
-  SetupBucketNotification:
-    Type: Custom::SetupBucketNotification
-    DependsOn:
-      - NotificationFunction
-      - S3InvokePermission
-    Properties:
-      ServiceToken: !GetAtt NotificationConfigFunction.Arn
-      BucketName: !Ref UploadBucket
-      LambdaArn: !GetAtt NotificationFunction.Arn
+            BucketName: !Ref S3UploadBucket
 
 Outputs:
-  UploadBucketName:
-    Description: Name of the S3 bucket for file uploads
-    Value: !Ref UploadBucket
-  
-  NotificationTopicARN:
-    Description: ARN of the SNS topic for notifications
+  BucketName:
+    Description: "Name of the S3 bucket"
+    Value: !Ref S3UploadBucket
+  FunctionName:
+    Description: "Lambda function name"
+    Value: !Ref S3NotificationFunction
+  SNSTopic:
+    Description: "SNS Topic ARN"
     Value: !Ref NotificationTopic
-  
-  NotificationFunctionName:
-    Description: Name of the Lambda function
-    Value: !Ref NotificationFunction
