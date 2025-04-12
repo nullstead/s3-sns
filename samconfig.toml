@@ -12,4 +12,6 @@ parameter_overrides = "Environment=dev"
 
 [prod.deploy.parameters]
 stack_name = "s3-sns-notify-prod"
+region = "eu-west-1"
+s3_prefix = "s3-sns"
 parameter_overrides = "Environment=prod"
