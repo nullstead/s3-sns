@@ -39,9 +39,9 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            sam deploy --resolve-s3 --config-env prod
+            sam deploy --guided --resolve-s3 --config-env prod
           elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            sam deploy --resolve-s3 --config-env default
+            sam deploy --guided --resolve-s3 --config-env default
           else
             echo "Branch not set for deployment."
             exit 1
