@@ -1,17 +1,29 @@
+# samconfig.toml
 version = 0.1
 
 [default]
+[default.global]
+[default.global.parameters]
+stack_name = "s3-lambda-sns-notification"
+
+[default.build]
+[default.build.parameters]
+use_container = true
+
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "s3-sns-notify-dev"
-s3_prefix = "s3-sns"
-region = "eu-west-1"
 capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
-parameter_overrides = "Environment=dev"
+resolve_s3 = true
 
+[dev]
+[dev.deploy]
+[dev.deploy.parameters]
+parameter_overrides = "Environment=dev"
+stack_name = "s3-lambda-sns-notification-dev"
+
+[prod]
+[prod.deploy]
 [prod.deploy.parameters]
-stack_name = "s3-sns-notify-prod"
-region = "eu-west-1"
-s3_prefix = "s3-sns"
 parameter_overrides = "Environment=prod"
+stack_name = "s3-lambda-sns-notification-prod"

@@ -1,0 +1,58 @@
+# .github/workflows/sam-pipeline.yml
+name: AWS SAM Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  sam-deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      AWS_REGION: eu-west-1
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Set environment variable based on branch
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+            echo "NOTIFICATION_EMAIL=${{ secrets.PROD_EMAIL_SUBSCRIPTION }}" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+            echo "NOTIFICATION_EMAIL=${{ secrets.DEV_EMAIL_SUBSCRIPTION }}" >> $GITHUB_ENV
+          fi
+      
+      - name: SAM Build
+        run: sam build --use-container
+      
+      - name: SAM Deploy
+        run: |
+          sam deploy \
+            --config-env ${{ env.ENVIRONMENT }} \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Environment=${{ env.ENVIRONMENT }} \
+              NotificationEmail=${{ env.NOTIFICATION_EMAIL }}

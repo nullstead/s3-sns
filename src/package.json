@@ -1,18 +1,17 @@
 {
-    "name": "s3-sns-event",
+    "name": "s3-lambda-sns-notification",
     "version": "1.0.0",
-    "description": "Trigger SNS email on S3 file upload using AWS Lambda",
-    "main": "handler.js",
-    "type": "module",
+    "description": "Event-driven architecture with S3, Lambda, and SNS",
+    "main": "src/handlers/processUpload.js",
     "scripts": {
-      "start": "sam local start-lambda",
-      "build": "sam build"
+      "test": "echo \"No tests specified\" && exit 0"
     },
     "dependencies": {
-      "@aws-sdk/client-sns": "^3.541.0"
+      "@aws-sdk/client-sns": "^3.529.1"
     },
     "engines": {
       "node": ">=22.0.0"
-    }
+    },
+    "author": "",
+    "license": "MIT"
   }
-  

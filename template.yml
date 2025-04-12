@@ -1,71 +1,89 @@
+# template.yaml
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >-
-  S3 to SNS email notification using AWS Lambda and AWS SAM (Node.js 22)
-
-Globals:
-  Function:
-    Runtime: nodejs22.x
-    Timeout: 10
-    MemorySize: 128
-    Architectures:
-      - x86_64
+Description: Event-driven architecture with S3, Lambda, and SNS
 
 Parameters:
   Environment:
     Type: String
+    Default: dev
     AllowedValues:
       - dev
       - prod
-    Default: dev
+    Description: Deployment environment
+
+  NotificationEmail:
+    Type: String
+    Description: Email address to subscribe to SNS notifications
+    Default: nullstead@gmail.com
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+      - x86_64
+    Timeout: 30
+    MemorySize: 128
+    Tracing: Active
 
 Resources:
-
-  S3UploadBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "upload-bucket-${Environment}-${AWS::AccountId}"
-
   NotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub "UploadNotificationTopic-${Environment}"
+      TopicName: !Sub 'file-upload-notification-${Environment}'
+      DisplayName: 'S3 Upload Notifications'
 
-  EmailSubscription:
+  EmailNotificationSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
-      Endpoint: "nullstead@gmail.com"
       TopicArn: !Ref NotificationTopic
+      Endpoint: !Ref NotificationEmail
 
-  S3NotificationFunction:
+  ProcessUploadFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub "S3NotificationFunction-${Environment}"
-      CodeUri: src/
-      Handler: handler.main
-      Events:
-        S3Upload:
-          Type: S3
-          Properties:
-            Bucket: !Ref S3UploadBucket
-            Events: s3:ObjectCreated:*
+      CodeUri: src/handlers/
+      Handler: processUpload.handler
       Environment:
         Variables:
           SNS_TOPIC_ARN: !Ref NotificationTopic
       Policies:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt NotificationTopic.TopicName
-        - S3ReadPolicy:
-            BucketName: !Ref S3UploadBucket
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ProcessUploadFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub 'arn:aws:s3:::file-upload-notification-${Environment}-${AWS::AccountId}'
+
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: LambdaPermission
+    Properties:
+      BucketName: !Sub 'file-upload-notification-${Environment}-${AWS::AccountId}'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt ProcessUploadFunction.Arn
 
 Outputs:
-  BucketName:
-    Description: "Name of the S3 bucket"
-    Value: !Ref S3UploadBucket
-  FunctionName:
-    Description: "Lambda function name"
-    Value: !Ref S3NotificationFunction
-  SNSTopic:
-    Description: "SNS Topic ARN"
+  UploadBucketName:
+    Description: S3 bucket for file uploads
+    Value: !Ref UploadBucket
+    
+  UploadBucketArn:
+    Description: ARN of the S3 bucket
+    Value: !GetAtt UploadBucket.Arn
+    
+  LambdaFunction:
+    Description: Lambda Function ARN
+    Value: !GetAtt ProcessUploadFunction.Arn
+    
+  NotificationTopicArn:
+    Description: SNS Topic ARN for notifications
     Value: !Ref NotificationTopic
