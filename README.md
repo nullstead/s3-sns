@@ -10,6 +10,10 @@ This project implements an event-driven architecture using AWS serverless servic
 - **AWS SAM**: Infrastructure as Code for defining and deploying resources
 - **GitHub Actions**: CI/CD pipeline for automated deployment
 
+## Network Architecture Diagram
+
+![N-A-D](./architecture.svg)
+
 ## Prerequisites
 
 - AWS Account
@@ -59,6 +63,7 @@ s3-lambda-sns-notification/
 ├── template.yaml           # SAM template defining AWS resources
 ├── samconfig.toml          # SAM configuration for deployments
 └── README.md               # Project documentation
+└── architecture.svg        # Network Architecture Diagram
 ```
 
 ## Notes
