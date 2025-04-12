@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  S3-to-SNS Notification Service
-  An event-driven architecture that sends email notifications when files are uploaded to S3
+  S3 upload notification service using AWS Lambda and SNS
 
+# Global parameters
 Parameters:
   Environment:
     Type: String
@@ -11,130 +11,83 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-    Description: Environment type (development or production)
+    Description: Environment name (dev or prod)
   
-  EmailSubscription:
+  AdminEmail:
     Type: String
     Description: Email address to receive notifications
-    Default: john.kponyo@amalitech.com
+    Default: admin@example.com
 
-Mappings:
-  EnvironmentMap:
-    dev:
-      BucketNameSuffix: -dev
-    prod:
-      BucketNameSuffix: -prod
+# Global variables
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: nodejs22.x
+    MemorySize: 128
+    Architectures:
+      - x86_64
 
 Resources:
-  # S3 bucket for file uploads - NOTIFICATION CONFIGURATION REMOVED TO BREAK CIRCULAR DEPENDENCY
-  FileUploadBucket:
+  # S3 bucket for file uploads
+  UploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName:
-        Fn::Sub:
-          - 'file-uploads-${AWS::AccountId}${Suffix}'
-          - Suffix: !FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]
-      # NotificationConfiguration removed to break circular dependency
+      BucketName: !Sub 'file-uploads-${Environment}-${AWS::AccountId}'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Function: !GetAtt NotificationFunction.Arn
 
-  # Lambda function to process S3 events
-  FileUploadProcessor:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub 'file-upload-processor-${Environment}'
-      Runtime: nodejs22.x
-      Architectures:
-        - x86_64
-      Handler: app.handler
-      CodeUri: ./src/
-      Description: Processes S3 upload events and sends notifications via SNS
-      MemorySize: 128
-      Timeout: 10
-      Environment:
-        Variables:
-          SNS_TOPIC_ARN: !Ref NotificationTopic
-          ENVIRONMENT: !Ref Environment
-      Policies:
-        - SNSPublishMessagePolicy:
-            TopicName: !GetAtt NotificationTopic.TopicName
-        - S3ReadPolicy:
-            BucketName: !Ref FileUploadBucket
-
-  # Lambda permission to allow S3 to invoke our function
-  LambdaInvokePermission:
+  # Lambda invoke permission from S3
+  S3InvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref FileUploadProcessor
+      FunctionName: !Ref NotificationFunction
       Principal: s3.amazonaws.com
-      SourceArn:
-        Fn::Sub:
-          - 'arn:aws:s3:::file-uploads-${AWS::AccountId}${Suffix}'
-          - Suffix: !FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]
+      SourceArn: !GetAtt UploadBucket.Arn
 
   # SNS Topic for notifications
   NotificationTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: !Sub 'file-upload-notifications-${Environment}'
-      DisplayName: !Sub 'File Upload Notifications (${Environment})'
+      DisplayName: 'S3 Upload Notifications'
 
-  # Email subscription to the SNS topic
-  EmailNotificationSubscription:
+  # SNS Subscription for email
+  EmailSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: email
       TopicArn: !Ref NotificationTopic
-      Endpoint: !Ref EmailSubscription
-      
-  # Use a custom resource to configure the S3 bucket notification after all resources are created
-  S3NotificationCustomResource:
-    Type: Custom::S3BucketNotification
-    DependsOn: 
-      - FileUploadBucket
-      - FileUploadProcessor
-      - LambdaInvokePermission
-    Properties:
-      ServiceToken: !Ref BucketNotificationFunction
-      BucketName: !Ref FileUploadBucket
-      NotificationConfiguration:
-        LambdaFunctionConfigurations:
-          - Event: 's3:ObjectCreated:*'
-            Function: !GetAtt FileUploadProcessor.Arn
+      Endpoint: !Ref AdminEmail
 
-  # Lambda function to handle the custom resource for S3 bucket notifications
-  BucketNotificationFunction:
+  # Lambda function to process S3 events
+  NotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'bucket-notification-handler-${Environment}'
-      Runtime: nodejs22.x
-      Handler: notification-handler.handler
-      CodeUri: ./src/
-      Description: Handles S3 bucket notification configuration
-      Timeout: 30
+      CodeUri: src/
+      Handler: index.handler
+      Description: Processes S3 upload events and sends notifications via SNS
+      Environment:
+        Variables:
+          TOPIC_ARN: !Ref NotificationTopic
+          ENVIRONMENT: !Ref Environment
       Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - 's3:PutBucketNotification'
-              Resource: 
-                Fn::Sub:
-                  - 'arn:aws:s3:::file-uploads-${AWS::AccountId}${Suffix}'
-                  - Suffix: !FindInMap [EnvironmentMap, !Ref Environment, BucketNameSuffix]
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
+        - S3ReadPolicy:
+            BucketName: !Ref UploadBucket
 
 Outputs:
-  FileUploadBucketName:
-    Description: "Name of the S3 bucket for file uploads"
-    Value: !Ref FileUploadBucket
-
-  FileUploadBucketArn:
-    Description: "ARN of the S3 bucket for file uploads"
-    Value: !GetAtt FileUploadBucket.Arn
+  UploadBucketName:
+    Description: Name of the S3 bucket for file uploads
+    Value: !Ref UploadBucket
   
-  NotificationTopicArn:
-    Description: "ARN of the SNS topic for notifications"
+  NotificationTopicARN:
+    Description: ARN of the SNS topic for notifications
     Value: !Ref NotificationTopic
   
-  LambdaFunctionArn:
-    Description: "ARN of the Lambda function"
-    Value: !GetAtt FileUploadProcessor.Arn
+  NotificationFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref NotificationFunction

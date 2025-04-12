@@ -5,82 +5,73 @@ on:
     branches:
       - main
       - develop
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-          - dev
-          - prod
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set environment based on branch or manual input
-        id: set-environment
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            ENVIRONMENT="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            ENVIRONMENT="prod"
-          else
-            ENVIRONMENT="dev"
-          fi
-          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
-          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
       
-      - name: Install dependencies for Lambda
+      - name: Setup AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Install dependencies
         run: |
           cd src
           npm install
       
-      - name: Setup AWS SAM
-        uses: aws-actions/setup-sam@v2
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      
-      - name: SAM Build
-        run: sam build
-      
-      - name: Get deployment parameters for environment
-        id: params
+      - name: Determine environment
+        id: determine-env
         run: |
-          if [ "${{ env.ENVIRONMENT }}" == "prod" ]; then
-            EMAIL="${{ secrets.PROD_EMAIL_SUBSCRIPTION }}"
+          if [[ $GITHUB_REF == 'refs/heads/main' ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
           else
-            EMAIL="${{ secrets.DEV_EMAIL_SUBSCRIPTION }}"
+            echo "environment=dev" >> $GITHUB_OUTPUT
           fi
-          echo "email=$EMAIL" >> $GITHUB_OUTPUT
       
-      - name: SAM Deploy
+      - name: Build SAM application
+        run: |
+          sam build --use-container
+          
+      - name: Deploy to AWS (dev environment)
+        if: steps.determine-env.outputs.environment == 'dev'
         run: |
           sam deploy \
-            --stack-name file-upload-notification-${{ env.ENVIRONMENT }} \
-            --no-fail-on-empty-changeset \
-            --no-confirm-changeset \
-            --resolve-s3 \
+            --stack-name s3-notification-service-dev \
+            --config-env dev \
             --parameter-overrides \
-              Environment=${{ env.ENVIRONMENT }} \
-              EmailSubscription=${{ steps.params.outputs.email }}
+              Environment=dev \
+              AdminEmail=${{ secrets.ADMIN_EMAIL_DEV }} \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
       
-      - name: Deployment summary
+      - name: Deploy to AWS (prod environment)
+        if: steps.determine-env.outputs.environment == 'prod'
         run: |
-          echo "Deployed to ${{ env.ENVIRONMENT }} environment successfully"
-          echo "Stack name: file-upload-notification-${{ env.ENVIRONMENT }}"
+          sam deploy \
+            --stack-name s3-notification-service-prod \
+            --config-env prod \
+            --parameter-overrides \
+              Environment=prod \
+              AdminEmail=${{ secrets.ADMIN_EMAIL_PROD }} \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset

@@ -1,24 +1,17 @@
 {
-    "name": "s3-notification-processor",
+    "name": "s3-notification-lambda",
     "version": "1.0.0",
-    "description": "Lambda function to process S3 events and send SNS notifications",
-    "main": "app.js",
+    "description": "Lambda function to handle S3 events and send notifications via SNS",
+    "main": "index.js",
     "engines": {
       "node": ">=22.0.0"
+    },
+    "dependencies": {
+      "@aws-sdk/client-sns": "^3.441.0"
     },
     "scripts": {
       "test": "echo \"Error: no test specified\" && exit 1"
     },
-    "keywords": [
-      "aws",
-      "lambda",
-      "s3",
-      "sns",
-      "serverless"
-    ],
     "author": "",
-    "license": "ISC",
-    "dependencies": {
-      "@aws-sdk/client-sns": "^3.510.0"
-    }
+    "license": "MIT"
   }

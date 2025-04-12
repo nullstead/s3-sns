@@ -1,30 +1,26 @@
 version = 0.1
+
 [default]
-[default.deploy]
-[default.deploy.parameters]
-stack_name = "file-upload-notification-dev"
-region = "eu-west-1"
-confirm_changeset = false
-capabilities = "CAPABILITY_IAM"
-disable_rollback = false
-parameter_overrides = "Environment=dev EmailSubscription=nullstead@gmail.com"
+[default.global]
+[default.global.parameters]
+stack_name = "s3-notification-service"
 
 [dev]
 [dev.deploy]
 [dev.deploy.parameters]
-stack_name = "file-upload-notification-dev"
-region = "eu-west-1"
+stack_name = "s3-notification-service-dev"
+s3_prefix = "s3-notification-service-dev"
+region = "us-east-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
-disable_rollback = false
-parameter_overrides = "Environment=dev EmailSubscription=nullstead@gmail.com"
+parameter_overrides = "Environment=dev"
 
 [prod]
 [prod.deploy]
 [prod.deploy.parameters]
-stack_name = "file-upload-notification-prod"
-region = "eu-west-1"
-confirm_changeset = false
+stack_name = "s3-notification-service-prod"
+s3_prefix = "s3-notification-service-prod"
+region = "us-east-1"
+confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-disable_rollback = false
-parameter_overrides = "Environment=prod EmailSubscription=john.kponyo@amalitech.com"
+parameter_overrides = "Environment=prod"
