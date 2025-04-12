@@ -22,7 +22,7 @@ Parameters:
 Resources:
 
   S3UploadBucket:
-    Type: AWS::Serverless::SimpleTable
+    Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "upload-bucket-${Environment}-${AWS::AccountId}"
 
