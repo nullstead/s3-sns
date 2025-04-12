@@ -10,7 +10,7 @@ stack_name = "s3-notification-service"
 [dev.deploy.parameters]
 stack_name = "s3-notification-service-dev"
 s3_prefix = "s3-notification-service-dev"
-region = "us-east-1"
+region = "eu-west-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "Environment=dev"
@@ -20,7 +20,7 @@ parameter_overrides = "Environment=dev"
 [prod.deploy.parameters]
 stack_name = "s3-notification-service-prod"
 s3_prefix = "s3-notification-service-prod"
-region = "us-east-1"
+region = "eu-west-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "Environment=prod"
